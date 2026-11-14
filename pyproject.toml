@@ -1,0 +1,25 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = [
+    "B008",  # Allow Depends(), Security(), Query() in FastAPI argument defaults
+    "B027",
+    "B904",
+    "E501",  # Line length handled by formatter
+    "UP047", # Keep generic Callable annotations compatible with python 3.12
+    "UP046", # Keep Generic[T] subclass compatible
+    "UP042",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"backend/migrations/env.py" = ["E402"]
+"backend/tests/conftest.py" = ["E402"]
+"backend/migrations/versions/*" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "strict"

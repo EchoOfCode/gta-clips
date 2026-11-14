@@ -4,6 +4,15 @@ services:
   db:
     image: postgres:17-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 768M
+    mem_limit: 768M
+    cpus: 0.50
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-gta_clip_engine}
       POSTGRES_USER: ${POSTGRES_USER:-gta_clip}
@@ -27,6 +36,15 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.20"
+          memory: 256M
+    mem_limit: 256M
+    cpus: 0.20
     command: ["redis-server", "--appendonly", "yes", "--save", "60", "1000"]
     volumes:
       - redis_data:/data
@@ -45,8 +63,19 @@ services:
         APP_UID: ${APP_UID:-10001}
         APP_GID: ${APP_GID:-10001}
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+    mem_limit: 512M
+    cpus: 0.50
     init: true
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-gta_clip}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-gta_clip_engine}
       REDIS_URL: redis://redis:6379/0
@@ -54,7 +83,7 @@ services:
       TZ: ${TZ:-Asia/Kolkata}
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
-      - "127.0.0.1:${API_PORT:-8090}:8000"
+      - "127.0.0.1:${API_PORT:-18090}:8000"
     volumes:
       - ${MEDIA_ROOT:-/mnt/data/gta-clip-engine}:/media
     depends_on:
@@ -78,8 +107,19 @@ services:
         APP_UID: ${APP_UID:-10001}
         APP_GID: ${APP_GID:-10001}
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 2048M
+    mem_limit: 2048M
+    cpus: 1.00
     init: true
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-gta_clip}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-gta_clip_engine}
       REDIS_URL: redis://redis:6379/0
@@ -93,6 +133,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; from redis import Redis; r = Redis.from_url('redis://redis:6379/0'); sys.exit(0 if r.ping() else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks: [internal]
     logging: *default-logging
 

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def infrastructure_smoke_test() -> dict[str, str]:
@@ -6,5 +6,5 @@ def infrastructure_smoke_test() -> dict[str, str]:
     return {
         "status": "completed",
         "message": "Background worker is connected and processing jobs.",
-        "completed_at": datetime.now(timezone.utc).isoformat(),
+        "completed_at": datetime.now(UTC).isoformat(),
     }

@@ -17,8 +17,10 @@ WORKDIR /app
 COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
+COPY alembic.ini ./alembic.ini
+COPY migrations ./migrations
 
-RUN mkdir -p /media/incoming /media/processing /media/rendered /media/thumbnails /media/archive /media/logs \
+RUN mkdir -p /media/incoming /media/processing /media/rendered /media/thumbnails /media/archive /media/logs /media/backups \
     && chown -R app:app /app
 
 USER app
