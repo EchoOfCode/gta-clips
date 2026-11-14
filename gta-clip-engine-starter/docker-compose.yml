@@ -1,0 +1,104 @@
+name: gta-clip-engine
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gta_clip_engine}
+      POSTGRES_USER: ${POSTGRES_USER:-gta_clip}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      TZ: ${TZ:-Asia/Kolkata}
+    volumes:
+      - ./state/postgres:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gta_clip} -d ${POSTGRES_DB:-gta_clip_engine}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+    logging: &default-logging
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1000"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [internal]
+    logging: *default-logging
+
+  api:
+    build:
+      context: ./backend
+      args:
+        APP_UID: ${APP_UID:-10001}
+        APP_GID: ${APP_GID:-10001}
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-gta_clip}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-gta_clip_engine}
+      REDIS_URL: redis://redis:6379/0
+      MEDIA_ROOT: /media
+      TZ: ${TZ:-Asia/Kolkata}
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "127.0.0.1:${API_PORT:-8090}:8000"
+    volumes:
+      - ${MEDIA_ROOT:-/mnt/data/gta-clip-engine}:/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks: [internal]
+    logging: *default-logging
+
+  worker:
+    build:
+      context: ./backend
+      args:
+        APP_UID: ${APP_UID:-10001}
+        APP_GID: ${APP_GID:-10001}
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-gta_clip}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-gta_clip_engine}
+      REDIS_URL: redis://redis:6379/0
+      MEDIA_ROOT: /media
+      TZ: ${TZ:-Asia/Kolkata}
+    command: ["rq", "worker", "--url", "redis://redis:6379/0", "default"]
+    volumes:
+      - ${MEDIA_ROOT:-/mnt/data/gta-clip-engine}:/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [internal]
+    logging: *default-logging
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  redis_data:
